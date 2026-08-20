@@ -10,10 +10,11 @@
 
   <title>Woop TV Player</title>
 
-  <!-- Préconnexion : réduit le délai avant le démarrage YouTube -->
-  <link rel="preconnect" href="https://www.youtube.com">
-  <link rel="preconnect" href="https://i.ytimg.com">
-  <link rel="preconnect" href="https://googlevideo.com">
+  <!-- Préconnexions pour accélérer YouTube -->
+  <link rel="preconnect" href="https://www.youtube.com" crossorigin>
+  <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
+  <link rel="preconnect" href="https://www.google.com" crossorigin>
+
   <link rel="dns-prefetch" href="//www.youtube.com">
   <link rel="dns-prefetch" href="//i.ytimg.com">
   <link rel="dns-prefetch" href="//googlevideo.com">
@@ -101,23 +102,59 @@
   <script src="https://www.youtube.com/iframe_api"></script>
 
   <script>
-    var params = new URLSearchParams(window.location.search);
+
+    var params = new URLSearchParams(
+      window.location.search
+    );
 
     var videoId = params.get("v");
+
+    var warmOnly =
+      params.get("warm") === "1";
 
     var player = null;
 
 
+    /* --------------------------------
+       Communication avec Woop TV
+    -------------------------------- */
+
+    function notify(type) {
+
+      try {
+
+        window.parent.postMessage(
+          {
+            type: type
+          },
+          "*"
+        );
+
+      } catch (e) {}
+
+    }
+
+
+    /* --------------------------------
+       Force le plein écran sur Tizen
+    -------------------------------- */
+
     function forceFullscreenSize() {
 
-      var host = document.getElementById("player");
+      var host =
+        document.getElementById("player");
+
 
       if (host) {
+
         host.style.position = "fixed";
+
         host.style.left = "0";
         host.style.top = "0";
+
         host.style.width = "100vw";
         host.style.height = "100vh";
+
       }
 
 
@@ -128,145 +165,380 @@
 
       if (frame) {
 
-        frame.setAttribute("width", "1920");
-        frame.setAttribute("height", "1080");
-
-        frame.style.position = "fixed";
-
-        frame.style.left = "0";
-        frame.style.top = "0";
-
-        frame.style.width = "100vw";
-        frame.style.height = "100vh";
-
-        frame.style.minWidth = "100vw";
-        frame.style.minHeight = "100vh";
-
-        frame.style.maxWidth = "none";
-        frame.style.maxHeight = "none";
-
-        frame.style.margin = "0";
-        frame.style.padding = "0";
-        frame.style.border = "0";
-      }
-    }
-
-
-    function notifyTrailerEnded() {
-
-      try {
-
-        window.parent.postMessage(
-          {
-            type: "wooptv-trailer-ended"
-          },
-          "*"
+        frame.setAttribute(
+          "width",
+          "1920"
         );
 
-      } catch (e) {}
+        frame.setAttribute(
+          "height",
+          "1080"
+        );
+
+
+        frame.style.position =
+          "fixed";
+
+        frame.style.left =
+          "0";
+
+        frame.style.top =
+          "0";
+
+
+        frame.style.width =
+          "100vw";
+
+        frame.style.height =
+          "100vh";
+
+
+        frame.style.minWidth =
+          "100vw";
+
+        frame.style.minHeight =
+          "100vh";
+
+
+        frame.style.maxWidth =
+          "none";
+
+        frame.style.maxHeight =
+          "none";
+
+
+        frame.style.margin =
+          "0";
+
+        frame.style.padding =
+          "0";
+
+        frame.style.border =
+          "0";
+
+      }
+
     }
 
+
+    /* --------------------------------
+       API YouTube prête
+    -------------------------------- */
 
     function onYouTubeIframeAPIReady() {
 
-      if (!videoId) {
 
-        document.getElementById("error").style.display = "flex";
+      /*
+        MODE WARM-UP
+
+        Woop appelle cette page discrètement
+        dès l'ouverture d'une fiche film.
+
+        GitHub + iframe_api + connexions
+        YouTube sont donc déjà chargés.
+
+        Aucune vidéo n'est lancée.
+      */
+
+      if (warmOnly) {
+
+        notify(
+          "wooptv-trailer-warmed"
+        );
 
         return;
+
       }
 
 
-      player = new YT.Player("player", {
+      /*
+        Aucun ID YouTube
+      */
 
-        width: 1920,
-        height: 1080,
+      if (!videoId) {
 
-        videoId: videoId,
-
-
-        playerVars: {
-
-          autoplay: 1,
-
-          /* Interface minimale */
-          controls: 0,
-          fs: 0,
-          disablekb: 1,
-
-          /* Sous-titres désactivés par défaut */
-          cc_load_policy: 0,
-
-          /* Supprime les annotations */
-          iv_load_policy: 3,
-
-          rel: 0,
-          playsinline: 1,
-
-          hl: "fr",
-
-          origin: "https://ghlami2.github.io",
-
-          widget_referrer:
-            "https://ghlami2.github.io/-wooptv-player/"
-        },
+        document
+          .getElementById("error")
+          .style.display = "flex";
 
 
-        events: {
+        notify(
+          "wooptv-trailer-error"
+        );
 
-          onReady: function(event) {
+        return;
 
-            forceFullscreenSize();
-
-            setTimeout(forceFullscreenSize, 100);
-            setTimeout(forceFullscreenSize, 500);
-            setTimeout(forceFullscreenSize, 1500);
-
-            /*
-              Sécurité supplémentaire :
-              si YouTube recharge malgré tout le module captions,
-              on essaie de le retirer.
-            */
-            try {
-              event.target.unloadModule("captions");
-            } catch (e) {}
-
-            event.target.playVideo();
-          },
+      }
 
 
-          onStateChange: function(event) {
+      /* --------------------------------
+         Création du player
+      -------------------------------- */
 
-            forceFullscreenSize();
+      player =
+        new YT.Player(
+          "player",
+          {
 
-            /*
-              Trailer terminé :
-              on prévient Woop TV qui ferme l'overlay
-              et revient sur la fiche du film.
-            */
-            if (event.data === YT.PlayerState.ENDED) {
-              notifyTrailerEnded();
+            width: 1920,
+
+            height: 1080,
+
+            videoId: videoId,
+
+
+            playerVars: {
+
+              /*
+                Lecture automatique
+              */
+
+              autoplay: 1,
+
+
+              /*
+                Interface minimale
+              */
+
+              controls: 0,
+
+              fs: 0,
+
+              disablekb: 1,
+
+
+              /*
+                Sous-titres
+                NON forcés
+              */
+
+              cc_load_policy: 0,
+
+
+              /*
+                Annotations désactivées
+              */
+
+              iv_load_policy: 3,
+
+
+              /*
+                Pas de suggestions
+                classiques
+              */
+
+              rel: 0,
+
+
+              /*
+                Lecture dans notre
+                player Woop
+              */
+
+              playsinline: 1,
+
+
+              /*
+                Interface FR
+              */
+
+              hl: "fr",
+
+
+              /*
+                Origine HTTPS
+                nécessaire pour YouTube
+              */
+
+              origin:
+                "https://ghlami2.github.io",
+
+
+              widget_referrer:
+                "https://ghlami2.github.io/-wooptv-player/"
+
+            },
+
+
+            events: {
+
+
+              /* ------------------------
+                 Player prêt
+              ------------------------ */
+
+              onReady:
+                function(event) {
+
+
+                  forceFullscreenSize();
+
+
+                  setTimeout(
+                    forceFullscreenSize,
+                    100
+                  );
+
+
+                  setTimeout(
+                    forceFullscreenSize,
+                    500
+                  );
+
+
+                  setTimeout(
+                    forceFullscreenSize,
+                    1500
+                  );
+
+
+                  /*
+                    Sécurité supplémentaire
+                    contre les sous-titres
+                    activés automatiquement.
+                  */
+
+                  try {
+
+                    event.target
+                      .unloadModule(
+                        "captions"
+                      );
+
+                  } catch (e) {}
+
+
+                  /*
+                    Dit à Woop que
+                    le player est prêt.
+                  */
+
+                  notify(
+                    "wooptv-trailer-ready"
+                  );
+
+
+                  /*
+                    Lecture immédiate
+                  */
+
+                  event.target
+                    .playVideo();
+
+                },
+
+
+              /* ------------------------
+                 État de lecture
+              ------------------------ */
+
+              onStateChange:
+                function(event) {
+
+
+                  forceFullscreenSize();
+
+
+                  /*
+                    La vidéo joue :
+                    Woop retire le spinner.
+                  */
+
+                  if (
+                    event.data ===
+                    YT.PlayerState.PLAYING
+                  ) {
+
+                    notify(
+                      "wooptv-trailer-playing"
+                    );
+
+                  }
+
+
+                  /*
+                    FIN DU TRAILER
+
+                    Woop ferme le player
+                    et revient automatiquement
+                    sur la fiche du film.
+                  */
+
+                  if (
+                    event.data ===
+                    YT.PlayerState.ENDED
+                  ) {
+
+                    notify(
+                      "wooptv-trailer-ended"
+                    );
+
+                  }
+
+                },
+
+
+              /* ------------------------
+                 Erreur YouTube
+              ------------------------ */
+
+              onError:
+                function() {
+
+
+                  document
+                    .getElementById("error")
+                    .style.display =
+                      "flex";
+
+
+                  notify(
+                    "wooptv-trailer-error"
+                  );
+
+                }
+
             }
-          },
 
-
-          onError: function() {
-            document.getElementById("error").style.display = "flex";
           }
-        }
-      });
+        );
 
 
-      setTimeout(forceFullscreenSize, 250);
-      setTimeout(forceFullscreenSize, 1000);
-      setTimeout(forceFullscreenSize, 2500);
+      /*
+        Sécurité Tizen :
+        on réimpose plusieurs fois
+        les dimensions plein écran.
+      */
+
+      setTimeout(
+        forceFullscreenSize,
+        250
+      );
+
+
+      setTimeout(
+        forceFullscreenSize,
+        1000
+      );
+
+
+      setTimeout(
+        forceFullscreenSize,
+        2500
+      );
+
     }
 
+
+    /* --------------------------------
+       Changement de résolution TV
+    -------------------------------- */
 
     window.addEventListener(
       "resize",
       forceFullscreenSize
     );
+
   </script>
 
 </body>
