@@ -2,12 +2,21 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
   >
 
   <title>Woop TV Player</title>
+
+  <!-- Préconnexion : réduit le délai avant le démarrage YouTube -->
+  <link rel="preconnect" href="https://www.youtube.com">
+  <link rel="preconnect" href="https://i.ytimg.com">
+  <link rel="preconnect" href="https://googlevideo.com">
+  <link rel="dns-prefetch" href="//www.youtube.com">
+  <link rel="dns-prefetch" href="//i.ytimg.com">
+  <link rel="dns-prefetch" href="//googlevideo.com">
 
   <style>
     * {
@@ -29,8 +38,8 @@
       min-width: 100% !important;
       min-height: 100% !important;
 
-      background: #000 !important;
       overflow: hidden !important;
+      background: #000 !important;
     }
 
     #player,
@@ -63,17 +72,18 @@
       position: fixed;
       inset: 0;
 
-      width: 100vw;
-      height: 100vh;
-
       align-items: center;
       justify-content: center;
+
+      width: 100vw;
+      height: 100vh;
 
       color: #fff;
       background: #000;
 
       font-family: Arial, sans-serif;
-      font-size: 32px;
+      font-size: 30px;
+      text-align: center;
 
       z-index: 10;
     }
@@ -103,12 +113,9 @@
       var host = document.getElementById("player");
 
       if (host) {
-
         host.style.position = "fixed";
-
         host.style.left = "0";
         host.style.top = "0";
-
         host.style.width = "100vw";
         host.style.height = "100vh";
       }
@@ -140,9 +147,23 @@
 
         frame.style.margin = "0";
         frame.style.padding = "0";
-
         frame.style.border = "0";
       }
+    }
+
+
+    function notifyTrailerEnded() {
+
+      try {
+
+        window.parent.postMessage(
+          {
+            type: "wooptv-trailer-ended"
+          },
+          "*"
+        );
+
+      } catch (e) {}
     }
 
 
@@ -159,7 +180,6 @@
       player = new YT.Player("player", {
 
         width: 1920,
-
         height: 1080,
 
         videoId: videoId,
@@ -169,17 +189,21 @@
 
           autoplay: 1,
 
-          controls: 1,
+          /* Interface minimale */
+          controls: 0,
+          fs: 0,
+          disablekb: 1,
+
+          /* Sous-titres désactivés par défaut */
+          cc_load_policy: 0,
+
+          /* Supprime les annotations */
+          iv_load_policy: 3,
 
           rel: 0,
-
           playsinline: 1,
 
-          fs: 0,
-
           hl: "fr",
-
-          cc_lang_pref: "fr",
 
           origin: "https://ghlami2.github.io",
 
@@ -194,53 +218,48 @@
 
             forceFullscreenSize();
 
-            setTimeout(
-              forceFullscreenSize,
-              100
-            );
+            setTimeout(forceFullscreenSize, 100);
+            setTimeout(forceFullscreenSize, 500);
+            setTimeout(forceFullscreenSize, 1500);
 
-            setTimeout(
-              forceFullscreenSize,
-              500
-            );
-
-            setTimeout(
-              forceFullscreenSize,
-              1500
-            );
+            /*
+              Sécurité supplémentaire :
+              si YouTube recharge malgré tout le module captions,
+              on essaie de le retirer.
+            */
+            try {
+              event.target.unloadModule("captions");
+            } catch (e) {}
 
             event.target.playVideo();
           },
 
 
-          onStateChange: function() {
+          onStateChange: function(event) {
 
             forceFullscreenSize();
+
+            /*
+              Trailer terminé :
+              on prévient Woop TV qui ferme l'overlay
+              et revient sur la fiche du film.
+            */
+            if (event.data === YT.PlayerState.ENDED) {
+              notifyTrailerEnded();
+            }
           },
 
 
           onError: function() {
-
             document.getElementById("error").style.display = "flex";
           }
         }
       });
 
 
-      setTimeout(
-        forceFullscreenSize,
-        250
-      );
-
-      setTimeout(
-        forceFullscreenSize,
-        1000
-      );
-
-      setTimeout(
-        forceFullscreenSize,
-        2500
-      );
+      setTimeout(forceFullscreenSize, 250);
+      setTimeout(forceFullscreenSize, 1000);
+      setTimeout(forceFullscreenSize, 2500);
     }
 
 
