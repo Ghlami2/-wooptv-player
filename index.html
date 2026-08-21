@@ -1,545 +1,672 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-  <meta
-    name="viewport"
-    content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  >
+<meta
+  name="viewport"
+  content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+>
 
-  <title>Woop TV Player</title>
+<title>Woop TV Player</title>
 
-  <!-- Préconnexions pour accélérer YouTube -->
-  <link rel="preconnect" href="https://www.youtube.com" crossorigin>
-  <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
-  <link rel="preconnect" href="https://www.google.com" crossorigin>
+<link rel="preconnect" href="https://www.youtube.com" crossorigin>
+<link rel="preconnect" href="https://i.ytimg.com" crossorigin>
+<link rel="preconnect" href="https://www.google.com" crossorigin>
 
-  <link rel="dns-prefetch" href="//www.youtube.com">
-  <link rel="dns-prefetch" href="//i.ytimg.com">
-  <link rel="dns-prefetch" href="//googlevideo.com">
+<link rel="dns-prefetch" href="//www.youtube.com">
+<link rel="dns-prefetch" href="//i.ytimg.com">
+<link rel="dns-prefetch" href="//googlevideo.com">
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+<style>
 
-    html,
-    body {
-      position: fixed;
-      left: 0;
-      top: 0;
+* {
+  box-sizing: border-box;
+}
 
-      margin: 0 !important;
-      padding: 0 !important;
+html,
+body {
+  position: fixed;
+  left: 0;
+  top: 0;
 
-      width: 100% !important;
-      height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 
-      min-width: 100% !important;
-      min-height: 100% !important;
+  width: 100% !important;
+  height: 100% !important;
 
-      overflow: hidden !important;
-      background: #000 !important;
-    }
+  overflow: hidden !important;
 
-    #player,
-    #player iframe,
-    iframe {
-      position: fixed !important;
+  background: #000 !important;
+}
 
-      left: 0 !important;
-      top: 0 !important;
+#player,
+#player iframe,
+iframe {
+  position: fixed !important;
 
-      margin: 0 !important;
-      padding: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
 
-      width: 100vw !important;
-      height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
 
-      min-width: 100vw !important;
-      min-height: 100vh !important;
+  width: 100vw !important;
+  height: 100vh !important;
 
-      max-width: none !important;
-      max-height: none !important;
+  min-width: 100vw !important;
+  min-height: 100vh !important;
 
-      border: 0 !important;
-      background: #000 !important;
-    }
+  max-width: none !important;
+  max-height: none !important;
 
-    #error {
-      display: none;
+  border: 0 !important;
 
-      position: fixed;
-      inset: 0;
+  background: #000 !important;
+}
 
-      align-items: center;
-      justify-content: center;
+#error {
+  display: none;
 
-      width: 100vw;
-      height: 100vh;
+  position: fixed;
+  inset: 0;
 
-      color: #fff;
-      background: #000;
+  align-items: center;
+  justify-content: center;
 
-      font-family: Arial, sans-serif;
-      font-size: 30px;
-      text-align: center;
+  width: 100vw;
+  height: 100vh;
 
-      z-index: 10;
-    }
-  </style>
+  color: #fff;
+  background: #000;
+
+  font-family: Arial, sans-serif;
+  font-size: 30px;
+
+  text-align: center;
+
+  z-index: 10;
+}
+
+</style>
 </head>
 
 <body>
 
-  <div id="player"></div>
+<div id="player"></div>
 
-  <div id="error">
-    Bande-annonce indisponible
-  </div>
+<div id="error">
+  Bande-annonce indisponible
+</div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 
-  <script>
+<script>
 
-    var params = new URLSearchParams(
-      window.location.search
+var params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+var videoId =
+  params.get("v");
+
+var warmOnly =
+  params.get("warm") === "1";
+
+var player = null;
+
+
+/* =====================================================
+   COMMUNICATION AVEC WOOP TV
+===================================================== */
+
+function notify(type) {
+
+  try {
+
+    window.parent.postMessage(
+      {
+        type: type
+      },
+      "*"
     );
 
-    var videoId = params.get("v");
+  } catch (e) {}
 
-    var warmOnly =
-      params.get("warm") === "1";
+}
 
-    var player = null;
 
+/* =====================================================
+   FORCE LE PLAYER EN PLEIN ÉCRAN
+===================================================== */
 
-    /* --------------------------------
-       Communication avec Woop TV
-    -------------------------------- */
+function forceFullscreenSize() {
 
-    function notify(type) {
+  var host =
+    document.getElementById(
+      "player"
+    );
 
-      try {
 
-        window.parent.postMessage(
-          {
-            type: type
-          },
-          "*"
-        );
+  if (host) {
 
-      } catch (e) {}
+    host.style.position =
+      "fixed";
 
-    }
+    host.style.left =
+      "0";
 
+    host.style.top =
+      "0";
 
-    /* --------------------------------
-       Force le plein écran sur Tizen
-    -------------------------------- */
+    host.style.width =
+      "100vw";
 
-    function forceFullscreenSize() {
+    host.style.height =
+      "100vh";
 
-      var host =
-        document.getElementById("player");
+  }
 
 
-      if (host) {
+  var frame =
+    document.querySelector(
+      "#player iframe"
+    ) ||
+    document.querySelector(
+      "iframe"
+    );
 
-        host.style.position = "fixed";
 
-        host.style.left = "0";
-        host.style.top = "0";
+  if (frame) {
 
-        host.style.width = "100vw";
-        host.style.height = "100vh";
+    frame.setAttribute(
+      "width",
+      "1920"
+    );
 
-      }
+    frame.setAttribute(
+      "height",
+      "1080"
+    );
 
 
-      var frame =
-        document.querySelector("#player iframe") ||
-        document.querySelector("iframe");
+    frame.style.position =
+      "fixed";
 
+    frame.style.left =
+      "0";
 
-      if (frame) {
+    frame.style.top =
+      "0";
 
-        frame.setAttribute(
-          "width",
-          "1920"
-        );
 
-        frame.setAttribute(
-          "height",
-          "1080"
-        );
+    frame.style.width =
+      "100vw";
 
+    frame.style.height =
+      "100vh";
 
-        frame.style.position =
-          "fixed";
 
-        frame.style.left =
-          "0";
+    frame.style.minWidth =
+      "100vw";
 
-        frame.style.top =
-          "0";
+    frame.style.minHeight =
+      "100vh";
 
 
-        frame.style.width =
-          "100vw";
+    frame.style.maxWidth =
+      "none";
 
-        frame.style.height =
-          "100vh";
+    frame.style.maxHeight =
+      "none";
 
 
-        frame.style.minWidth =
-          "100vw";
+    frame.style.margin =
+      "0";
 
-        frame.style.minHeight =
-          "100vh";
+    frame.style.padding =
+      "0";
 
+    frame.style.border =
+      "0";
 
-        frame.style.maxWidth =
-          "none";
+  }
 
-        frame.style.maxHeight =
-          "none";
+}
 
 
-        frame.style.margin =
-          "0";
+/* =====================================================
+   DÉSACTIVATION FORCÉE DES SOUS-TITRES
+===================================================== */
 
-        frame.style.padding =
-          "0";
+function forceCaptionsOff(target) {
 
-        frame.style.border =
-          "0";
+  if (!target) {
+    return;
+  }
 
-      }
 
-    }
+  /*
+    On ne se contente pas de :
 
+    cc_load_policy: 0
 
-    /* --------------------------------
-       API YouTube prête
-    -------------------------------- */
+    car YouTube peut restaurer une préférence
+    de sous-titres enregistrée précédemment.
 
-    function onYouTubeIframeAPIReady() {
+    On force donc leur désactivation
+    directement après initialisation.
+  */
 
 
-      /*
-        MODE WARM-UP
+  try {
 
-        Woop appelle cette page discrètement
-        dès l'ouverture d'une fiche film.
+    target.setOption(
+      "captions",
+      "track",
+      {}
+    );
 
-        GitHub + iframe_api + connexions
-        YouTube sont donc déjà chargés.
+  } catch (e) {}
 
-        Aucune vidéo n'est lancée.
-      */
 
-      if (warmOnly) {
+  try {
 
-        notify(
-          "wooptv-trailer-warmed"
-        );
+    target.setOption(
+      "captions",
+      "reload",
+      true
+    );
 
-        return;
+  } catch (e) {}
 
-      }
 
+  try {
 
-      /*
-        Aucun ID YouTube
-      */
+    target.unloadModule(
+      "captions"
+    );
 
-      if (!videoId) {
+  } catch (e) {}
 
-        document
-          .getElementById("error")
-          .style.display = "flex";
+}
 
 
-        notify(
-          "wooptv-trailer-error"
-        );
+/* =====================================================
+   API YOUTUBE PRÊTE
+===================================================== */
 
-        return;
+function onYouTubeIframeAPIReady() {
 
-      }
 
+  /* -------------------------------------------------
+     MODE WARM-UP
 
-      /* --------------------------------
-         Création du player
-      -------------------------------- */
+     Woop TV peut charger cette page discrètement
+     pendant que l'utilisateur consulte la fiche.
 
-      player =
-        new YT.Player(
-          "player",
-          {
+     Cela initialise déjà :
+     - GitHub Pages
+     - iframe_api
+     - connexion YouTube
+     - DNS Google/GoogleVideo
 
-            width: 1920,
+     Mais aucune vidéo n'est lancée.
+  ------------------------------------------------- */
 
-            height: 1080,
+  if (warmOnly) {
 
-            videoId: videoId,
+    notify(
+      "wooptv-trailer-warmed"
+    );
 
+    return;
 
-            playerVars: {
+  }
+
+
+  /* -------------------------------------------------
+     PAS D'ID YOUTUBE
+  ------------------------------------------------- */
+
+  if (!videoId) {
+
+    document
+      .getElementById("error")
+      .style.display =
+        "flex";
+
+
+    notify(
+      "wooptv-trailer-error"
+    );
+
+    return;
+
+  }
+
+
+  /* =================================================
+     CRÉATION DU PLAYER YOUTUBE
+  ================================================= */
+
+  player =
+    new YT.Player(
+      "player",
+      {
+
+        width: 1920,
+
+        height: 1080,
+
+        videoId: videoId,
+
+
+        playerVars: {
+
+          /* Lecture automatique */
+
+          autoplay: 1,
+
+
+          /* Interface minimale */
+
+          controls: 0,
+
+          fs: 0,
+
+          disablekb: 1,
+
+
+          /*
+            Ne jamais demander explicitement
+            les sous-titres.
+          */
+
+          cc_load_policy: 0,
+
+
+          /* Pas d'annotations */
+
+          iv_load_policy: 3,
+
+
+          /* Suggestions limitées */
+
+          rel: 0,
+
+
+          /*
+            Lecture directement
+            dans le player Woop TV.
+          */
+
+          playsinline: 1,
+
+
+          /* Interface française */
+
+          hl: "fr",
+
+
+          /*
+            Origine HTTPS GitHub Pages
+            utilisée par le player.
+          */
+
+          origin:
+            "https://ghlami2.github.io",
+
+
+          widget_referrer:
+            "https://ghlami2.github.io/-wooptv-player/"
+
+        },
+
+
+        events: {
+
+
+          /* =========================================
+             PLAYER YOUTUBE PRÊT
+          ========================================= */
+
+          onReady:
+            function(event) {
+
+
+              forceFullscreenSize();
+
 
               /*
-                Lecture automatique
+                PREMIÈRE désactivation
+                des sous-titres.
               */
 
-              autoplay: 1,
+              forceCaptionsOff(
+                event.target
+              );
 
 
               /*
-                Interface minimale
+                On recommence après quelques
+                millisecondes car le module captions
+                peut être chargé APRÈS onReady
+                sur certaines versions de Tizen.
               */
 
-              controls: 0,
+              setTimeout(
+                function() {
 
-              fs: 0,
+                  forceCaptionsOff(
+                    event.target
+                  );
 
-              disablekb: 1,
+                },
+                150
+              );
+
+
+              setTimeout(
+                function() {
+
+                  forceCaptionsOff(
+                    event.target
+                  );
+
+                },
+                700
+              );
 
 
               /*
-                Sous-titres
-                NON forcés
+                Sécurité plein écran Tizen.
               */
 
-              cc_load_policy: 0,
+              setTimeout(
+                forceFullscreenSize,
+                100
+              );
+
+
+              setTimeout(
+                forceFullscreenSize,
+                500
+              );
+
+
+              setTimeout(
+                forceFullscreenSize,
+                1500
+              );
 
 
               /*
-                Annotations désactivées
+                IMPORTANT :
+
+                READY ne signifie PAS encore
+                que la vidéo est visible.
+
+                Woop TV garde donc son écran
+                noir + spinner à ce moment-là.
               */
 
-              iv_load_policy: 3,
+              notify(
+                "wooptv-trailer-ready"
+              );
 
 
               /*
-                Pas de suggestions
-                classiques
+                Lancement du trailer.
               */
 
-              rel: 0,
-
-
-              /*
-                Lecture dans notre
-                player Woop
-              */
-
-              playsinline: 1,
-
-
-              /*
-                Interface FR
-              */
-
-              hl: "fr",
-
-
-              /*
-                Origine HTTPS
-                nécessaire pour YouTube
-              */
-
-              origin:
-                "https://ghlami2.github.io",
-
-
-              widget_referrer:
-                "https://ghlami2.github.io/-wooptv-player/"
+              event.target
+                .playVideo();
 
             },
 
 
-            events: {
+          /* =========================================
+             CHANGEMENT D'ÉTAT
+          ========================================= */
+
+          onStateChange:
+            function(event) {
 
 
-              /* ------------------------
-                 Player prêt
-              ------------------------ */
-
-              onReady:
-                function(event) {
+              forceFullscreenSize();
 
 
-                  forceFullscreenSize();
+              /* -------------------------------------
+                 LA VIDÉO JOUE RÉELLEMENT
+              ------------------------------------- */
+
+              if (
+                event.data ===
+                YT.PlayerState.PLAYING
+              ) {
 
 
-                  setTimeout(
-                    forceFullscreenSize,
-                    100
-                  );
+                /*
+                  Dernière sécurité :
+                  on coupe encore les captions
+                  au moment précis où la vidéo joue.
+                */
 
-
-                  setTimeout(
-                    forceFullscreenSize,
-                    500
-                  );
-
-
-                  setTimeout(
-                    forceFullscreenSize,
-                    1500
-                  );
-
-
-                  /*
-                    Sécurité supplémentaire
-                    contre les sous-titres
-                    activés automatiquement.
-                  */
-
-                  try {
-
-                    event.target
-                      .unloadModule(
-                        "captions"
-                      );
-
-                  } catch (e) {}
-
-
-                  /*
-                    Dit à Woop que
-                    le player est prêt.
-                  */
-
-                  notify(
-                    "wooptv-trailer-ready"
-                  );
-
-
-                  /*
-                    Lecture immédiate
-                  */
-
+                forceCaptionsOff(
                   event.target
-                    .playVideo();
-
-                },
+                );
 
 
-              /* ------------------------
-                 État de lecture
-              ------------------------ */
+                /*
+                  SEULEMENT MAINTENANT :
 
-              onStateChange:
-                function(event) {
+                  Woop TV peut retirer
+                  l'écran noir + spinner.
 
+                  Cela évite d'afficher
+                  les miniatures / éléments YouTube
+                  pendant l'initialisation.
+                */
 
-                  forceFullscreenSize();
+                notify(
+                  "wooptv-trailer-playing"
+                );
 
-
-                  /*
-                    La vidéo joue :
-                    Woop retire le spinner.
-                  */
-
-                  if (
-                    event.data ===
-                    YT.PlayerState.PLAYING
-                  ) {
-
-                    notify(
-                      "wooptv-trailer-playing"
-                    );
-
-                  }
+              }
 
 
-                  /*
-                    FIN DU TRAILER
+              /* -------------------------------------
+                 FIN DU TRAILER
+              ------------------------------------- */
 
-                    Woop ferme le player
-                    et revient automatiquement
-                    sur la fiche du film.
-                  */
-
-                  if (
-                    event.data ===
-                    YT.PlayerState.ENDED
-                  ) {
-
-                    notify(
-                      "wooptv-trailer-ended"
-                    );
-
-                  }
-
-                },
+              if (
+                event.data ===
+                YT.PlayerState.ENDED
+              ) {
 
 
-              /* ------------------------
-                 Erreur YouTube
-              ------------------------ */
+                /*
+                  Woop TV ferme le player
+                  et revient automatiquement
+                  sur la fiche du film.
+                */
 
-              onError:
-                function() {
+                notify(
+                  "wooptv-trailer-ended"
+                );
+
+              }
+
+            },
 
 
-                  document
-                    .getElementById("error")
-                    .style.display =
-                      "flex";
+          /* =========================================
+             ERREUR YOUTUBE
+          ========================================= */
+
+          onError:
+            function() {
 
 
-                  notify(
-                    "wooptv-trailer-error"
-                  );
+              document
+                .getElementById(
+                  "error"
+                )
+                .style.display =
+                  "flex";
 
-                }
+
+              notify(
+                "wooptv-trailer-error"
+              );
 
             }
 
-          }
-        );
+        }
 
-
-      /*
-        Sécurité Tizen :
-        on réimpose plusieurs fois
-        les dimensions plein écran.
-      */
-
-      setTimeout(
-        forceFullscreenSize,
-        250
-      );
-
-
-      setTimeout(
-        forceFullscreenSize,
-        1000
-      );
-
-
-      setTimeout(
-        forceFullscreenSize,
-        2500
-      );
-
-    }
-
-
-    /* --------------------------------
-       Changement de résolution TV
-    -------------------------------- */
-
-    window.addEventListener(
-      "resize",
-      forceFullscreenSize
+      }
     );
 
-  </script>
+
+  /*
+    Sécurité supplémentaire
+    pour les anciennes versions
+    du navigateur Tizen.
+  */
+
+  setTimeout(
+    forceFullscreenSize,
+    250
+  );
+
+
+  setTimeout(
+    forceFullscreenSize,
+    1000
+  );
+
+
+  setTimeout(
+    forceFullscreenSize,
+    2500
+  );
+
+}
+
+
+/* =====================================================
+   CHANGEMENT DE RÉSOLUTION / VIEWPORT
+===================================================== */
+
+window.addEventListener(
+  "resize",
+  forceFullscreenSize
+);
+
+</script>
 
 </body>
 </html>
